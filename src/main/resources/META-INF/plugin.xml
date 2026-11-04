@@ -1,0 +1,39 @@
+<idea-plugin>
+  <id>dev.angularlite.idea</id>
+  <name>Angular Lite</name>
+  <version>0.1.0</version>
+  <vendor>Angular Lite contributors</vendor>
+  <description>Angular and TypeScript syntax highlighting, code completion, template diagnostics and navigation. Automatically prepares its own Node.js and language servers on first use. No terminal setup and no Ultimate subscription required. Internet access is needed for the first preparation. Requires LSP4IJ and TextMate Bundles.</description>
+  <idea-version since-build="253"/>
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.lang</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
+  <depends>org.jetbrains.plugins.textmate</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <completion.contributor language="any" implementationClass="dev.angularlite.TemplateCompletion" order="first, before LSPCompletionContributor"/>
+    <typedHandler implementation="dev.angularlite.TemplateCompletion$Typed"/>
+    <gotoDeclarationHandler implementation="dev.angularlite.ComponentNavigation" order="first"/>
+    <externalAnnotator language="HTML" implementationClass="dev.angularlite.ResolvedVariables"/>
+    <externalAnnotator language="textmate" implementationClass="dev.angularlite.ResolvedVariables"/>
+    <externalAnnotator language="TypeScript" implementationClass="dev.angularlite.ResolvedVariables"/>
+    <externalAnnotator language="TEXT" implementationClass="dev.angularlite.ResolvedVariables"/>
+    <lang.inspectionSuppressor language="HTML" implementationClass="dev.angularlite.HtmlInspectionSuppressor"/>
+    <notificationGroup id="Angular Lite" displayType="BALLOON" isLogByDefault="true"/>
+    <textmate.bundleProvider implementation="dev.angularlite.Bundles"/>
+    <editorHighlighterProvider filetype="HTML" implementationClass="dev.angularlite.HtmlHighlighter" order="first"/>
+    <editorHighlighterProvider filetype="textmate" implementationClass="dev.angularlite.HtmlHighlighter" order="first"/>
+    <editorHighlighterProvider filetype="TypeScript" implementationClass="dev.angularlite.HtmlHighlighter" order="first"/>
+    <applicationService serviceImplementation="dev.angularlite.Settings"/>
+    <applicationConfigurable parentId="language" id="angularlite" displayName="Angular Lite" instance="dev.angularlite.Configuration"/>
+  </extensions>
+  <applicationListeners>
+    <listener class="dev.angularlite.PluginLifecycle" topic="com.intellij.ide.plugins.DynamicPluginListener"/>
+  </applicationListeners>
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+    <server id="angularlite.angular" name="Angular Lite — Angular" factoryClass="dev.angularlite.Servers$Angular"/>
+    <server id="angularlite.typescript" name="Angular Lite — TypeScript" factoryClass="dev.angularlite.Servers$TypeScript"/>
+    <fileNamePatternMapping patterns="*.html" serverId="angularlite.angular" languageId="html" documentMatcher="dev.angularlite.AngularMatcher"/>
+    <fileNamePatternMapping patterns="*.ts" serverId="angularlite.angular" languageId="typescript" documentMatcher="dev.angularlite.AngularMatcher"/>
+    <fileNamePatternMapping patterns="*.ts" serverId="angularlite.typescript" languageId="typescript" documentMatcher="dev.angularlite.AngularMatcher"/>
+  </extensions>
+</idea-plugin>

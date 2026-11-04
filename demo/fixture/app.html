@@ -1,0 +1,65 @@
+<h1>{{ title() }}</h1>
+<demo-child [from]="criteria.from"></demo-child>
+@if(hasMachin) {
+  <div bidule>
+    <demo-child
+      [from]="criteria.from"
+    >
+    </demo-child>
+  </div>
+}
+<demo-child [label]="greet()" />
+@for (item of items; track item) {
+  <p>{{ item }}</p>
+}
+@if (items.length) {
+  <demo-child [label]='plainLabel' />
+  <demo-child [label]="title()" />
+  {{ items.length }}
+  <section>{{ title() }}</section>
+  @for (entry of items; track entry; let idx = $index) {
+    <demo-child [label]="entry" />
+    <span>{{ entry }} {{ idx }} {{ title() }}</span>
+  }
+} @else {
+  <p>{{ greet() }}</p>
+}
+@switch (items.length) {
+  @case (0) { <p>{{ title() }}</p> }
+  @default { <p>{{ greet() }}</p> }
+}
+@if (items; as countries) {
+  <demo-child [label]='countries[0]' />
+  {{ countries.length }}
+  {{ title() }}
+  @if (countries.length; as count) {
+    {{ count }}
+    {{ countries.length }}
+  }
+}
+@defer (on idle) {
+  <span>{{ greet() }}</span>
+} @placeholder {
+  <span>Chargement…</span>
+}
+<main>
+  @if (hasMachin) {
+    <section>
+      @for (row of items; track row) {
+        <div><demo-child [label] = "row" [from] = "criteria.from"></demo-child>
+          <span>{{ row }} {{ criteria.from }}</span>
+        </div>
+      }
+    </section>
+  }
+</main>
+<ng-container *ngIf="items as legacyItems">
+  <div *ngFor="let legacyItem of legacyItems; index as legacyIndex">
+    <demo-child [label]="legacyItem" [from]="criteria.from"></demo-child>
+    <span>{{ legacyItem }} {{ legacyIndex }} {{ title() }}</span>
+  </div>
+</ng-container>
+<div [ngSwitch]="items.length">
+  <span *ngSwitchCase="0">{{ title() }}</span>
+  <span *ngSwitchDefault>{{ greet() }}</span>
+</div>

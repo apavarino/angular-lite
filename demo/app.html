@@ -1,0 +1,10 @@
+<h1>{{ title() }}</h1>
+<demo-child [label]="greet()" />
+@for (item of items; track item) {
+  <p>{{ item }}</p>
+}
+@defer (on idle) {
+  <span>{{ greet() }}</span>
+} @placeholder {
+  <span>Chargement…</span>
+}

@@ -1,0 +1,13 @@
+build/
+dist/
+deps/
+sandbox/
+**/node_modules/
+**/.idea/
+.auto-screen/
+demo/template-mode-fixture/
+.repowise/
+__pycache__/
+*.pyc
+.env
+.env.*

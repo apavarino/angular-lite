@@ -1,0 +1,48 @@
+Angular Lite 0.1.0 NAV5
+Angular 22.0.7
+strictTemplates=false; fullTemplateTypeCheck absent; tsconfig unchanged
+Whole template wrapped in @if (hasMachin)
+Windows; macOS execution not tested
+
+IDE 2026.2.4
+DISABLED JavaScript
+DISABLED AngularJS
+DISABLED com.intellij.modules.ultimate
+PASS navigation criteria.from
+PASS navigation plainLabel
+PASS navigation countries[0]
+PASS navigation {{ count
+PASS navigation [label] = "row
+PASS navigation {{ legacyItem
+PASS navigation {{ legacyIndex
+PASS resolved colors criteria refs=5
+PASS resolved colors plainLabel refs=1
+PASS resolved colors countries refs=4
+PASS resolved colors count refs=1
+PASS resolved colors row refs=3
+PASS resolved colors legacyItem refs=2
+PASS resolved colors legacyIndex refs=1
+PASS automatic popup @
+PASS automatic popup *
+PASS completion + insertion @ -> if
+PASS completion + insertion @f -> for
+PASS completion + insertion <div * -> ngIf
+PASS completion + insertion <div *ng -> ngFor
+PASS no snippets in comments/strings/expressions/scripts/email
+PASS actual dynamic unload/load and inspection suppression
+PASS navigation criteria.from
+PASS navigation plainLabel
+PASS navigation countries[0]
+PASS navigation {{ count
+PASS navigation [label] = "row
+PASS navigation {{ legacyItem
+PASS navigation {{ legacyIndex
+PASS resolved colors criteria refs=5
+PASS resolved colors plainLabel refs=1
+PASS resolved colors countries refs=4
+PASS resolved colors count refs=1
+PASS resolved colors row refs=3
+PASS resolved colors legacyItem refs=2
+PASS resolved colors legacyIndex refs=1
+PASS applied editor colors after reload: 48; no HtmlUnknownTag warnings
+PASS ALL IDE CHECKS
