@@ -3,7 +3,7 @@
   <name>Angular Lite</name>
   <version>0.1.0</version>
   <vendor>Angular Lite contributors</vendor>
-  <description>Angular and TypeScript syntax highlighting, code completion, template diagnostics and navigation. Automatically prepares its own Node.js and language servers on first use. No terminal setup and no Ultimate subscription required. Internet access is needed for the first preparation. Requires LSP4IJ and TextMate Bundles.</description>
+  <description>Angular and TypeScript syntax highlighting, code completion, template diagnostics and navigation. Internet access is needed for the first preparation. Requires LSP4IJ and TextMate Bundles.</description>
   <idea-version since-build="253"/>
   <depends>com.intellij.modules.platform</depends>
   <depends>com.intellij.modules.lang</depends>
