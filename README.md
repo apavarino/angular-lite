@@ -21,6 +21,11 @@ plugin. It does not install your application's dependencies or change its PATH.
 Yarn Plug'n'Play and dependencies unavailable through standard Node resolution
 are not supported.
 
+No separate Java installation is required: the plugin runs inside IntelliJ IDEA's
+[bundled JetBrains Runtime](https://www.jetbrains.com/help/idea/installation-guide.html).
+Its bytecode targets Java 21, but the IDE may require a newer runtime (Java 25
+for the tested IDEA 2026.2.4). Keep the runtime bundled with your IDE.
+
 ## Installation
 
 1. Install LSP4IJ and enable TextMate Bundles as described above.
@@ -112,57 +117,6 @@ python build.py --idea /path/to/idea
 On macOS, pass the application's `Contents` directory. Alternatively, set
 `ANGULAR_LITE_IDEA` to the IDE directory. The result is
 `dist/angular-lite-0.1.0.zip`; IDEA and LSP4IJ binaries are not bundled.
-
-### Tests
-
-After building, set `ANGULAR_LITE_IDEA` and run the lexer/color check:
-
-```sh
-python tests/binding-colors-check.py
-```
-
-Server integration tests additionally require Node.js and installed demo
-dependencies (`npm ci --prefix demo`). The bootstrap test prepares the tooling
-cache used by the multi-root, legacy and explicit-version template tests:
-
-```sh
-python tests/bootstrap-check.py
-node tests/component-index-check.mjs
-python tests/multi-root-check.py
-python tests/legacy-check.py
-python tests/template-mode-check.py basic 22.0.7
-```
-
-The Windows IDE probe uses a separate profile and the IDE in `deps/idea-2026.2.4`:
-
-```sh
-python tests/ide-probe.py 262 build/template-mode-22.0.7
-python tests/run-ide-probe.py 262 build/template-mode-22.0.7
-```
-
-Its expected result is `PASS ALL IDE CHECKS` in
-`build/ide-probe-262/result.txt`. These interactive checks are separate from CI;
-the release workflow builds the plugin and runs the lexer/color checks on Linux.
-
-## Releases with GitHub Actions
-
-The [release workflow](.github/workflows/release.yml) runs when a **`v*` tag** is
-pushed. It checks that the tag matches the version in
-`src/main/resources/META-INF/plugin.xml`, downloads checksum-verified build
-dependencies, builds the ZIP, runs color checks, uploads a workflow artifact and
-attaches the single installable ZIP to a GitHub release.
-
-For the current version:
-
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-For future versions, update the manifest version before committing and tagging.
-The workflow also supports **Run workflow** from the Actions UI; a manual run
-builds a downloadable artifact without creating a release. Workflow artifacts
-are retained for 30 days; release assets remain until explicitly removed.
 
 ## Troubleshooting
 
