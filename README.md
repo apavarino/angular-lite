@@ -1,7 +1,7 @@
 # Angular Lite
 
 Angular and TypeScript highlighting, completion, diagnostics and navigation for
-IntelliJ IDEA, without requiring the paid JavaScript or Angular plugins.
+IntelliJ IDEA.
 
 Current plugin version: **0.1.0**.
 
