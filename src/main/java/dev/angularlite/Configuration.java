@@ -10,7 +10,7 @@ public final class Configuration implements Configurable {
     public String getDisplayName() { return "Angular Lite"; }
     public JComponent createComponent() {
         JPanel panel = new JPanel(new GridLayout(0, 1, 4, 8));
-        panel.add(new JLabel("Angular Lite 0.1.0 — correctif templates NAV5"));
+        panel.add(new JLabel("Angular Lite 0.1.0"));
         JButton diagnostics = new JButton("Copier le diagnostic de navigation");
         diagnostics.addActionListener(event -> {
             com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(

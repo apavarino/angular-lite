@@ -83,7 +83,6 @@ navigation and resolved colors inside nested control flow in that configuration.
 
 **The project's tsconfig and build behavior are not changed.** The editor may
 report additional strict template diagnostics compared with the project build.
-The settings panel identifies this revision as **NAV5**, still version **0.1.0**.
 
 ## Compatibility and validation
 
