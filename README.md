@@ -3,8 +3,6 @@
 Angular and TypeScript highlighting, completion, diagnostics and navigation for
 IntelliJ IDEA.
 
-Current plugin version: **0.1.0**.
-
 ## Prerequisites
 
 - IntelliJ IDEA with **TextMate Bundles** enabled. The plugin declares platform
