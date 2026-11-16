@@ -114,13 +114,13 @@
       "begin": "\\{",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.definition.block.ts"
+          "name": "punctuation.definition.block.ng"
         }
       },
       "end": "\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.definition.block.ts"
+          "name": "punctuation.definition.block.ng"
         }
       },
       "contentName": "control.block.body.ng",

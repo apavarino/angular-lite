@@ -7,7 +7,11 @@ import com.intellij.psi.PsiElement;
 /** Angular's template checker owns element validation in Angular HTML files. */
 public final class HtmlInspectionSuppressor implements InspectionSuppressor {
     @Override public boolean isSuppressedFor(PsiElement element, String toolId) {
-        if (!"HtmlUnknownTag".equals(toolId) || element == null) return false;
+        if (element == null) return false;
+        if ("CheckEmptyScriptTag".equals(toolId)) {
+            var tag = com.intellij.psi.util.PsiTreeUtil.getParentOfType(element, com.intellij.psi.xml.XmlTag.class, false);
+            if (tag == null || com.intellij.xml.util.HtmlUtil.isHtml5Tag(tag.getName())) return false;
+        } else if (!"HtmlUnknownTag".equals(toolId)) return false;
         var file = element.getContainingFile();
         if (file == null) return false;
         var virtualFile = file.getVirtualFile();

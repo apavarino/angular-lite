@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import {resolve, relative, isAbsolute, sep} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {command} from './launch.mjs';
-import {ComponentIndex} from './component-index.mjs';
+import {ComponentIndex,documentKey} from './component-index.mjs';
 
 export function owner(uri, roots) {
   if (!uri?.startsWith('file:')) return -1;
@@ -56,14 +56,15 @@ export function run(kind,runtimes,roots) {
         if(task) {pending.delete(message.id); message.error?task.reject(message.error):task.resolve(message.result);}
       }
     });
-    const failed=error=>{for(const task of pending.values()) task.reject({code:-32603,message:String(error)}); pending.clear();};
+    const failed=error=>{server.failure=String(error); for(const task of pending.values()) task.reject({code:-32603,message:server.failure}); pending.clear();};
+    child.stdin.on('error',failed);
     child.on('error',failed);
     child.on('exit',code=>{failed(`Language server ${root} exited (${code})`); if(!stopping) send({method:'window/showMessage',params:{type:1,message:`Angular Lite : moteur arrêté pour ${root}. Rouvrez le projet pour le relancer.`}});});
     return server;
   });
   function request(server,method,params,clientId) {
     return new Promise((resolve,reject)=>{
-      if(server.child.exitCode!==null || server.child.stdin.destroyed) return reject({code:-32603,message:'Language server stopped'});
+      if(server.failure || server.child.exitCode!==null || server.child.stdin.destroyed) return reject({code:-32603,message:'Language server stopped'});
       const id=++next; server.pending.set(id,{resolve,reject});
       if(clientId!==undefined) {const list=active.get(clientId)??[]; list.push({server,id}); active.set(clientId,list);}
       write(server.child.stdin,{id,method,params});
@@ -111,15 +112,16 @@ export function run(kind,runtimes,roots) {
     if(method==='exit') {stopping=true; for(const s of servers) write(s.child.stdin,message); setTimeout(stop,1000).unref(); return;}
     await ready;
     let params=message.params;
-    if(method==='textDocument/didOpen') documents.set(params.textDocument.uri,{text:params.textDocument.text,version:++documentGeneration});
-    if(method==='textDocument/didClose') documents.delete(params.textDocument.uri);
+    const key=documentKey(params?.textDocument?.uri);
+    if(method==='textDocument/didOpen') documents.set(key,{text:params.textDocument.text,version:++documentGeneration});
+    if(method==='textDocument/didClose') documents.delete(key);
     if(method==='textDocument/didChange') {
-      const old=documents.get(params.textDocument.uri);
+      const old=documents.get(key);
       if(old) {
         let text=old.text;
         const offset=p=>{const lines=text.split('\n'); return lines.slice(0,p.line).reduce((n,s)=>n+s.length+1,0)+p.character;};
         for(const change of params.contentChanges) text=change.range?text.slice(0,offset(change.range.start))+change.text+text.slice(offset(change.range.end)):change.text;
-        documents.set(params.textDocument.uri,{text,version:++documentGeneration});
+        documents.set(key,{text,version:++documentGeneration});
       }
     }
     const data=params?.data;
@@ -139,20 +141,37 @@ export function run(kind,runtimes,roots) {
       return;
     }
     if(id===undefined) {
-      for(const s of index>=0?[servers[index]]:servers) write(s.child.stdin,{...message,params});
+      for(const s of index>=0?[servers[index]]:servers) if(!s.failure) write(s.child.stdin,{...message,params});
       return;
     }
     try {
       if(method==='shutdown') stopping=true;
       if(index>=0) {
-        let result=await request(servers[index],method,params,id);
+        // The exit notification already identifies this root. Editor refreshes
+        // must not generate another internal-error notification per request.
+        if(servers[index].failure) {
+          send({id,result:method.endsWith('/resolve')?params:null});
+          return;
+        }
+        const selector=kind==='angular' && method==='textDocument/definition' && await indexes[index].selectorClass(params);
+        let result;
+        if(selector) {
+          const references=await request(servers[index],'textDocument/references',{
+            textDocument:params.textDocument,position:selector,context:{includeDeclaration:false}
+          },id);
+          result=[];
+          const sources=new Map();
+          for(const reference of references??[]) {
+            if(reference.uri.endsWith('.html') || await indexes[index].isInlineTag(reference,sources)) result.push(reference);
+          }
+        } else result=await request(servers[index],method,params,id);
         if(kind==='angular' && method==='textDocument/definition' && (!result || (Array.isArray(result)&&!result.length)))
           result=await indexes[index].definitions(params);
         const needsRoute=['textDocument/completion','completionItem/resolve','textDocument/codeAction','codeAction/resolve','textDocument/documentLink','textDocument/inlayHint'].includes(method);
         send({id,result:needsRoute?tag(result,index):result});
       }
       else if(method==='workspace/symbol' || method==='shutdown') {
-        const results=await Promise.all(servers.map(async s=>tag(await request(s,method,params,id),s.index)));
+        const results=await Promise.all(servers.filter(s=>!s.failure).map(async s=>tag(await request(s,method,params,id),s.index)));
         send({id,result:method==='shutdown'?null:results.flat().filter(Boolean)});
       } else if(params?.textDocument) send({id,result:null});
       else if(servers.length===1) send({id,result:await request(servers[0],method,params,id)});

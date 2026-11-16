@@ -4,6 +4,12 @@ import {join, relative, isAbsolute, sep} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const skipped=new Set(['node_modules','.git','.idea','.angular','dist','build','coverage','target']);
+// IDEA, Node and Angular encode Windows drive letters differently in file URIs.
+export function documentKey(uri) {
+  if(!uri?.startsWith('file:')) return uri;
+  const file=fileURLToPath(uri);
+  return pathToFileURL(process.platform==='win32'?file.replace(/^[a-z]:/i,drive=>drive.toUpperCase()):file).href;
+}
 export function tagAt(text,position) {
   const lines=text.split('\n');
   if(position.line>=lines.length) return null;
@@ -70,22 +76,48 @@ export class ComponentIndex {
           const start=source.getLineAndCharacterOfPosition(target.getStart(source));
           const end=source.getLineAndCharacterOfPosition(target.getEnd());
           for(const selector of value.text.split(',').map(s=>s.trim()))
-            if(/^[a-z][\w]*-[\w-]+$/i.test(selector)) result.push({selector,location:{uri:pathToFileURL(file).href,range:{start,end}}});
+            if(selector) result.push({selector, selectorStart:value.getStart(source)+1, selectorEnd:value.getEnd()-1,
+              location:{uri:pathToFileURL(file).href,range:{start,end}}});
         }
       }
     }
     return result;
   }
+  async selectorClass(params) {
+    const uri=params.textDocument.uri;
+    const open=this.documents.get(documentKey(uri));
+    if(!open || !uri.endsWith('.ts')) return null;
+    const file=fileURLToPath(uri), signature=`open:${open.version}`;
+    let cached=this.cache.get(file);
+    if(cached?.signature!==signature) {
+      cached={signature,entries:this.parse(open.text,file)};
+      this.cache.set(file,cached);
+    }
+    const lines=open.text.split('\n');
+    const offset=lines.slice(0,params.position.line).reduce((n,line)=>n+line.length+1,0)+params.position.character;
+    return cached.entries.find(entry=>entry.selectorStart<=offset && offset<entry.selectorEnd)?.location.range.start;
+  }
+  async isInlineTag(reference, sources) {
+    if(!reference.uri.endsWith('.ts')) return false;
+    const key=documentKey(reference.uri);
+    if(!sources.has(key)) {
+      let text=this.documents.get(key)?.text;
+      if(text===undefined) {try {text=await readFile(fileURLToPath(key),'utf8');} catch {return false;}}
+      sources.set(key,text.split('\n'));
+    }
+    const {line,character}=reference.range.start;
+    return sources.get(key)[line]?.[character]==='<';
+  }
   async definitions(params) {
     const uri=params?.textDocument?.uri;
     if(!uri?.endsWith('.html')) return [];
-    let text=this.documents.get(uri)?.text;
+    let text=this.documents.get(documentKey(uri))?.text;
     if(text===undefined) {try {text=await readFile(fileURLToPath(uri),'utf8');} catch {return [];}}
     const name=tagAt(text,params.position); if(!name) return [];
     const results=[];
     for(const file of await this.list()) {
       try {
-        const open=this.documents.get(pathToFileURL(file).href);
+        const open=this.documents.get(documentKey(pathToFileURL(file).href));
         const signature=open?`open:${open.version}`:`disk:${(await stat(file)).mtimeMs}`;
         let cached=this.cache.get(file);
         if(!cached || cached.signature!==signature) {

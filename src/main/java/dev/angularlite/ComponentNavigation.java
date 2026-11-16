@@ -21,7 +21,9 @@ public final class ComponentNavigation implements GotoDeclarationHandler {
         var file = PsiDocumentManager.getInstance(project).getPsiFile(document);
         if (file == null || file.getVirtualFile() == null) { NavigationDiagnostics.record("stop: no host PSI file"); return null; }
         NavigationDiagnostics.record("host language=" + file.getLanguage().getID() + " type=" + file.getFileType().getName() + " offset=" + offset);
-        if (!"html".equalsIgnoreCase(file.getVirtualFile().getExtension())) { NavigationDiagnostics.record("stop: not HTML"); return null; }
+        String extension = file.getVirtualFile().getExtension();
+        if (!"html".equalsIgnoreCase(extension) && !"ts".equalsIgnoreCase(extension)) return null;
+        if ("ts".equalsIgnoreCase(extension) && !inSelector(document.getImmutableCharSequence(), offset)) return null;
         if (!new AngularMatcher().match(file.getVirtualFile(), project)) { NavigationDiagnostics.record("stop: no Angular root"); return null; }
         // Do not restrict navigation to tag names: HTML PSI does not necessarily
         // expose references for expressions or aliases inside Angular blocks.
@@ -41,6 +43,18 @@ public final class ComponentNavigation implements GotoDeclarationHandler {
         }
     }
     public record NavigationLocation(Document document, int offset) {}
+    private static boolean inSelector(CharSequence text, int offset) {
+        // The router verifies the actual Angular decorator with the TypeScript AST.
+        int i = Math.min(offset, text.length()) - 1;
+        while (i >= 0 && "'\"`\n\r".indexOf(text.charAt(i)) < 0) i--;
+        if (i < 0 || Character.isWhitespace(text.charAt(i))) return false;
+        i--;
+        while (i >= 0 && Character.isWhitespace(text.charAt(i))) i--;
+        if (i < 0 || text.charAt(i--) != ':') return false;
+        while (i >= 0 && Character.isWhitespace(text.charAt(i))) i--;
+        if (i >= 0 && "'\"".indexOf(text.charAt(i)) >= 0) i--;
+        return i >= 7 && "selector".contentEquals(text.subSequence(i - 7, i + 1));
+    }
     public static NavigationLocation hostLocation(Document document, int offset) {
         while (document instanceof DocumentWindow fragment) {
             if (!fragment.isValid()) return null;
@@ -51,6 +65,9 @@ public final class ComponentNavigation implements GotoDeclarationHandler {
     }
     public static int identifierOffset(CharSequence text, int offset) {
         if (isNavigationPosition(text, offset)) return offset;
+        int next = offset;
+        while (next >= 0 && next < text.length() && "<[/(*".indexOf(text.charAt(next)) >= 0) next++;
+        if (next != offset && isNavigationPosition(text, next)) return next;
         // Cmd+B is commonly invoked with the caret just after the identifier,
         // immediately before the closing quote of [input]='value'.
         if (offset > 0 && offset <= text.length() && isNavigationPosition(text, offset - 1)) return offset - 1;

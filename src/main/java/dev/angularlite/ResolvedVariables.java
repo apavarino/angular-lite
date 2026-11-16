@@ -2,6 +2,7 @@ package dev.angularlite;
 
 import com.intellij.lang.annotation.*;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.fileTypes.SyntaxHighlighter;
 import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory;
 import com.intellij.openapi.progress.ProgressManager;
@@ -20,10 +21,10 @@ import java.util.concurrent.*;
 public final class ResolvedVariables extends ExternalAnnotator<ResolvedVariables.Input, ResolvedVariables.Result> {
     // PSI can survive a dynamic plugin unload. Do not retain this plugin's Result
     // class (and its class loader) in PSI user data.
-    private static final Key<com.intellij.openapi.util.Trinity<Long, Long, List<TextRange>>> CACHE = Key.create("angularlite.resolved.variables");
+    private static final Key<com.intellij.openapi.util.Trinity<Long, Long, Map<TextRange, TextAttributesKey>>> CACHE = Key.create("angularlite.resolved.variables");
     public record Input(PsiFile file, Document document, String text, long stamp, long projectStamp,
                         SyntaxHighlighter syntax, CompletableFuture<List<LanguageServerItem>> servers, Result cached) {}
-    public record Result(long stamp, long projectStamp, List<TextRange> ranges, boolean complete) {}
+    public record Result(long stamp, long projectStamp, Map<TextRange, TextAttributesKey> colors, boolean complete) {}
     @Override public Input collectInformation(PsiFile file) {
         var virtual = file.getVirtualFile();
         if (virtual == null || !("html".equals(virtual.getExtension()) || "ts".equals(virtual.getExtension()))
@@ -34,7 +35,7 @@ public final class ResolvedVariables extends ExternalAnnotator<ResolvedVariables
         if (syntax == null) return null;
         var servers = LanguageServiceAccessor.getInstance(file.getProject()).getLanguageServers(file,
             features -> "angularlite.angular".equals(features.getServerWrapper().getServerDefinition().getId()),
-            features -> features.getDefinitionFeature().isSupported(file));
+            features -> features.getHoverFeature().isSupported(file));
         var stored = file.getUserData(CACHE);
         Result cached = stored == null ? null : new Result(stored.first, stored.second, stored.third, true);
         return new Input(file, document, document.getText(), document.getModificationStamp(),
@@ -44,12 +45,12 @@ public final class ResolvedVariables extends ExternalAnnotator<ResolvedVariables
         if (input == null) return null;
         Result cached = input.cached();
         if (cached != null && cached.complete() && cached.stamp() == input.stamp() && cached.projectStamp() == input.projectStamp()) return cached;
-        List<TextRange> ranges = new ArrayList<>();
-        List<CompletableFuture<?>> pending = new ArrayList<>();
+        Map<TextRange, TextAttributesKey> colors = new HashMap<>();
+        List<CompletableFuture<Hover>> pending = new ArrayList<>();
         try {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
             var servers = await(input.servers(), input, deadline);
-            if (servers.isEmpty()) return new Result(input.stamp(), input.projectStamp(), List.of(), false);
+            if (servers.isEmpty()) return new Result(input.stamp(), input.projectStamp(), Map.of(), false);
             var server = servers.getFirst();
             var identifier = new TextDocumentIdentifier(server.getServerWrapper().toUriString(input.file().getVirtualFile()));
             var lexer = input.syntax().getHighlightingLexer();
@@ -63,30 +64,55 @@ public final class ResolvedVariables extends ExternalAnnotator<ResolvedVariables
                 }
                 lexer.advance();
             }
+            int line = 0, lineStart = 0, scanned = 0;
             for (int base = 0; base < candidates.size(); base += 8) {
                 pending.clear();
                 var batch = candidates.subList(base, Math.min(base + 8, candidates.size()));
                 for (TextRange range : batch) {
                     int offset = range.getStartOffset();
                     // UTF-16 offsets, as required by the language server.
-                    int line = 0, lineStart = 0;
-                    for (int i = 0; i < offset; i++) if (input.text().charAt(i) == '\n') { line++; lineStart = i + 1; }
-                    pending.add(server.getTextDocumentService().definition(new DefinitionParams(identifier, new Position(line, offset - lineStart))));
+                    while (scanned < offset) {
+                        if (input.text().charAt(scanned++) == '\n') { line++; lineStart = scanned; }
+                    }
+                    pending.add(server.getTextDocumentService().hover(new HoverParams(identifier, new Position(line, offset - lineStart))));
                 }
                 for (int i = 0; i < pending.size(); i++) {
-                    var answer = (org.eclipse.lsp4j.jsonrpc.messages.Either<?, ?>) await(pending.get(i), input, deadline);
-                    if (answer != null && answer.get() instanceof List<?> locations && !locations.isEmpty()) ranges.add(batch.get(i));
+                    var color = hoverColor(await(pending.get(i), input, deadline));
+                    if (color != null) colors.put(batch.get(i), color);
                 }
             }
-            return new Result(input.stamp(), input.projectStamp(), List.copyOf(ranges), true);
-        } catch (ExecutionException | TimeoutException error) {
-            return new Result(input.stamp(), input.projectStamp(), List.of(), false);
+            return new Result(input.stamp(), input.projectStamp(), Map.copyOf(colors), true);
+        } catch (com.intellij.openapi.progress.ProcessCanceledException error) {
+            throw error;
+        } catch (ExecutionException | TimeoutException | CancellationException error) {
+            return new Result(input.stamp(), input.projectStamp(), Map.of(), false);
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             return null;
         } finally {
             for (var request : pending) if (!request.isDone()) request.cancel(true);
         }
+    }
+    private static TextAttributesKey hoverColor(Hover hover) {
+        if (hover == null || hover.getContents() == null) return null;
+        var contents = hover.getContents();
+        if (contents.isRight()) return signatureColor(contents.getRight().getValue().replaceFirst("^```(?:typescript|ts)?\\s*", ""));
+        for (var item : contents.getLeft()) {
+            String value = item.isLeft() ? item.getLeft() : item.getRight().getValue();
+            var color = signatureColor(value);
+            if (color != null) return color;
+        }
+        return null;
+    }
+    private static final java.util.regex.Pattern SIGNAL_TYPE = java.util.regex.Pattern.compile(
+        "^\\(property\\) [^:\\n]+:\\s*(?:Signal|WritableSignal|InputSignal|InputSignalWithTransform|ModelSignal)\\b");
+    private static TextAttributesKey signatureColor(String signature) {
+        if (SIGNAL_TYPE.matcher(signature).find()) return AngularSyntaxHighlighter.SIGNAL;
+        if (signature.startsWith("(property) ")) return AngularSyntaxHighlighter.FIELD;
+        if (signature.startsWith("(method) ") || signature.startsWith("(function) ")) return AngularSyntaxHighlighter.METHOD;
+        if (signature.startsWith("(variable) ") || signature.startsWith("(parameter) ") || signature.startsWith("(reference) ")
+            || signature.startsWith("(let) ")) return AngularSyntaxHighlighter.VARIABLE;
+        return null;
     }
     private static <T> T await(CompletableFuture<T> future, Input input, long deadline) throws InterruptedException, ExecutionException, TimeoutException {
         for (;;) {
@@ -104,8 +130,8 @@ public final class ResolvedVariables extends ExternalAnnotator<ResolvedVariables
         Document document = PsiDocumentManager.getInstance(file.getProject()).getDocument(file);
         if (document == null || document.getModificationStamp() != result.stamp()
             || PsiModificationTracker.getInstance(file.getProject()).getModificationCount() != result.projectStamp()) return;
-        if (result.complete()) file.putUserData(CACHE, com.intellij.openapi.util.Trinity.create(result.stamp(), result.projectStamp(), result.ranges()));
-        for (TextRange range : result.ranges()) holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
-            .range(range).textAttributes(AngularSyntaxHighlighter.VARIABLE).create();
+        if (result.complete()) file.putUserData(CACHE, com.intellij.openapi.util.Trinity.create(result.stamp(), result.projectStamp(), result.colors()));
+        result.colors().forEach((range, color) -> holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
+            .range(range).textAttributes(color).create());
     }
 }

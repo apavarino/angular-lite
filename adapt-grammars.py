@@ -16,6 +16,15 @@ for rule in tag['repository'].values():
         rule['begin']=rule['begin'].replace('(=)', r'\s*(=)\s*')
 tag_path.write_text(json.dumps(tag,indent=2)+'\n',encoding='utf-8')
 injections={}
+# Keep block braces distinguishable from interpolation delimiters in the editor scheme.
+for filename,rule_name,scope in [('template','interpolation','punctuation.definition.interpolation.ng'),
+                                  ('template-blocks','blockBody','punctuation.definition.block.ng')]:
+    path=root/'syntaxes'/f'{filename}.json'
+    data=json.loads(path.read_text())
+    rule=data['repository'][rule_name]
+    for capture in ('beginCaptures','endCaptures'):
+        rule[capture]['0']['name']=scope
+    path.write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
 for g in grammars:
     data=json.loads((root/g['path']).read_text())
     if g.get('injectTo') and 'injectionSelector' in data:

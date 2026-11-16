@@ -46,8 +46,12 @@ public final class IntegrationProbe implements StartupActivity, DumbAware {
                     }
                     checkNavigation(project, editor, report);
                     checkColors(project, editor, report);
+                    checkSelector(project, editor, report);
                     checkAutoPopup(project, editor, "", '@', "if", report);
                     checkAutoPopup(project, editor, "<div ", '*', "ngIf", report);
+                    checkAutoPopup(project, editor, "<demo-child | />", '[', "label", report);
+                    checkAutoPopup(project, editor, "<demo-child | />", '(', "saved", report);
+                    checkAutoPopup(project, editor, "{{ criteria| }}", '.', "from", report);
                     checkCompletion(project, editor, "@", "if", "@if () {\n  \n}", report);
                     checkCompletion(project, editor, "@f", "for", "@for (item of ; track item) {\n  \n}", report);
                     checkCompletion(project, editor, "<div *", "ngIf", "<div *ngIf=\"\"", report);
@@ -79,11 +83,24 @@ public final class IntegrationProbe implements StartupActivity, DumbAware {
             editor.getCaretModel().moveToOffset(text.length());
         });
     }
+    private static void checkSelector(Project project, Editor html, StringBuilder report) {
+        var file = LocalFileSystem.getInstance().findFileByPath(project.getBasePath() + "/child.ts");
+        Editor[] ts = new Editor[1];
+        edt(() -> ts[0] = FileEditorManager.getInstance(project).openTextEditor(new OpenFileDescriptor(project,file),true));
+        int offset = ts[0].getDocument().getText().indexOf("demo-child") + 2;
+        var targets = ReadAction.nonBlocking(() -> GotoDeclarationAction.findAllTargetElements(project, ts[0], offset))
+            .inSmartMode(project).executeSynchronously();
+        long usages = ReadAction.compute(() -> Arrays.stream(targets).filter(target ->
+            target.getContainingFile().getName().equals("app.html")).map(PsiElement::getTextOffset).distinct().count());
+        if (usages < 3) throw new AssertionError("Selector navigation: " + usages + " distinct usages");
+        report.append("PASS selector navigation to ").append(usages).append(" template usages\n");
+        edt(() -> FileEditorManager.getInstance(project).openFile(FileDocumentManager.getInstance().getFile(html.getDocument()),true));
+    }
     private static void checkNavigation(Project project, Editor editor, StringBuilder report) throws Exception {
         var psi = ReadAction.compute(() -> PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument()));
         LanguageServiceAccessor.getInstance(project).getLanguageServers(psi, f -> true, f -> true).get(120, TimeUnit.SECONDS);
         String text = editor.getDocument().getText();
-        for (String needle : List.of("criteria.from", "plainLabel", "countries[0]", "{{ count", "[label] = \"row", "{{ legacyItem", "{{ legacyIndex")) {
+        for (String needle : List.of("demo-child", "greet()", "*ngIf", "criteria.from", "plainLabel", "countries[0]", "{{ count", "[label] = \"row", "{{ legacyItem", "{{ legacyIndex")) {
             int index = text.indexOf(needle);
             if (index < 0) throw new AssertionError("Missing marker " + needle);
             int offset = index + (needle.startsWith("{{") ? 4 : needle.startsWith("[label]") ? 12 : 1);
@@ -105,7 +122,7 @@ public final class IntegrationProbe implements StartupActivity, DumbAware {
         var annotator = type.getConstructor().newInstance();
         var collect = type.getMethod("collectInformation", PsiFile.class);
         var annotate = Arrays.stream(type.getMethods()).filter(m -> m.getName().equals("doAnnotate") && !m.isBridge()).findFirst().orElseThrow();
-        List<TextRange> ranges = List.of();
+        Set<TextRange> ranges = Set.of();
         for (int attempt=0; attempt<15; attempt++) {
             try {
                 var input = ReadAction.compute(() -> {
@@ -113,7 +130,7 @@ public final class IntegrationProbe implements StartupActivity, DumbAware {
                 });
                 var result = annotate.invoke(annotator, input);
                 if (result != null && (Boolean) result.getClass().getMethod("complete").invoke(result)) {
-                    ranges = (List<TextRange>) result.getClass().getMethod("ranges").invoke(result);
+                    ranges = ((Map<TextRange, ?>) result.getClass().getMethod("colors").invoke(result)).keySet();
                     break;
                 }
             } catch (java.lang.reflect.InvocationTargetException e) {
@@ -164,14 +181,15 @@ public final class IntegrationProbe implements StartupActivity, DumbAware {
         report.append("PASS completion + insertion ").append(text).append(" -> ").append(label).append('\n');
     }
     private static void checkAutoPopup(Project project, Editor editor, String text, char typed, String label, StringBuilder report) throws Exception {
-        setText(project, editor, text);
+        setText(project, editor, text.replace("|", ""));
+        if (text.contains("|")) edt(() -> editor.getCaretModel().moveToOffset(text.indexOf('|')));
         edt(() -> com.intellij.openapi.editor.actionSystem.TypedAction.getInstance().actionPerformed(editor, typed,
             com.intellij.ide.DataManager.getInstance().getDataContext(editor.getContentComponent())));
         boolean[] found={false};
         for(int i=0;i<50 && !found[0];i++) {
             edt(() -> {
                 var lookup=LookupManager.getActiveLookup(editor);
-                found[0]=lookup!=null && lookup.getItems().stream().anyMatch(item->item.getLookupString().equals(label));
+                found[0]=lookup!=null && lookup.getItems().stream().anyMatch(item->Set.of(label,"["+label+"]","("+label+")").contains(item.getLookupString()));
             });
             if(!found[0]) Thread.sleep(150);
         }
@@ -215,8 +233,9 @@ public final class IntegrationProbe implements StartupActivity, DumbAware {
         for(int i=0;i<60;i++) {
             colors[0]=0; unknown[0]=0;
             ReadAction.run(() -> DaemonCodeAnalyzerEx.processHighlights(editor.getDocument(),project,HighlightSeverity.INFORMATION,0,editor.getDocument().getTextLength(), info -> {
-                if(info.forcedTextAttributesKey!=null && "ANGULAR_LITE_TEMPLATE_VARIABLE".equals(info.forcedTextAttributesKey.getExternalName())) colors[0]++;
+                if(info.forcedTextAttributesKey!=null && Set.of("NG.VARIABLE", "NG.SIGNAL", "TS.INSTANCE_MEMBER_VARIABLE", "TS.INSTANCE_MEMBER_FUNCTION").contains(info.forcedTextAttributesKey.getExternalName())) colors[0]++;
                 if("HtmlUnknownTag".equals(info.getInspectionToolId())) unknown[0]++;
+                if("CheckEmptyScriptTag".equals(info.getInspectionToolId())) unknown[0]++;
                 return true;
             }));
             if(colors[0]>0 && unknown[0]==0) break;

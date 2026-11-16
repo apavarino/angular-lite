@@ -26,8 +26,6 @@ public final class Servers {
                 try {
                     var roots = Paths.roots(project);
                     if (roots.isEmpty()) throw new java.io.IOException("Aucun projet Angular installé trouvé dans le projet ou ses sous-dossiers (8 niveaux maximum).");
-                    Path angularRoot = roots.getFirst();
-                    status("Projet Angular détecté : " + angularRoot, NotificationType.INFORMATION);
                     String node = settings.node;
                     Path runtimes = Path.of(settings.runtimes).toAbsolutePath().normalize();
                     if (settings.automatic) {
@@ -43,9 +41,10 @@ public final class Servers {
                     command.addParameters(roots.stream().map(Path::toString).toList());
                     setCommandLine(command.withWorkDirectory(project.getBasePath()));
                     super.start();
-                    status("Angular Lite 0.1.0 — " + roots.size() + " racine(s) Angular démarrée(s)", NotificationType.INFORMATION);
+                    if (progress != null) progress.expire();
                 } catch (Exception error) {
-                    if (!cancelled && !project.isDisposed()) status(error.getMessage(), NotificationType.ERROR);
+                    // LSP4IJ reports startup failures, including their cause.
+                    if (progress != null) progress.expire();
                     if (error instanceof InterruptedException) Thread.currentThread().interrupt();
                     throw new CannotStartProcessException(error);
                 }

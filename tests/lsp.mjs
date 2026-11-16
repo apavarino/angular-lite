@@ -72,6 +72,10 @@ async function run(kind, cases) {
       ['app.html','title',3,'title'],
       ['app.html','greet',3,'greet'],
       ['app.html','[label]',3,'label'],
+      ...legacy ? [] : [
+        ['app.html','(saved)',3,'saved'],
+        ['app.html','criteria.from',10,'from']
+      ],
       ['app.ts','{{ message',6,'message'],
       ['app.ts','(click)="toggle',12,'toggle']
     ]:[['app.ts','this.title',8,'title']];
@@ -102,6 +106,14 @@ async function run(kind, cases) {
       assert(found,'TypeScript semantic tokens should reproduce the decorator color override');
     }
     if(kind==='angular') {
+      if(!legacy && process.env.ANGULAR_LITE_TEST_ROOTS) {
+        const targets=await request('textDocument/definition',{textDocument:{uri:uri('child.ts')},
+          position:point(readFileSync(join(demo,'child.ts'),'utf8'),'demo-child',2)});
+        const html=readFileSync(join(demo,'app.html'),'utf8').split('\n');
+        assert(targets.length>=3 && targets.every(target=>target.uri.endsWith('/app.html') &&
+          html[target.range.start.line].slice(target.range.start.character).startsWith('<demo-child')));
+        console.log('PASS selector navigation returns template usages');
+      }
       const component=readFileSync(join(demo,'app.ts'),'utf8');
       const changedComponent=component.replace('readonly title', 'readonly country = { eu: true };\n  readonly title');
       send({method:'textDocument/didChange',params:{textDocument:{uri:uri('app.ts'),version:2},contentChanges:[{text:changedComponent}]}});

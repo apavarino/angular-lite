@@ -1,15 +1,21 @@
 <idea-plugin>
   <id>dev.angularlite.idea</id>
   <name>Angular Lite</name>
-  <version>0.1.0</version>
+  <version>0.1.2</version>
   <vendor>Angular Lite contributors</vendor>
   <description>Angular and TypeScript syntax highlighting, code completion, template diagnostics and navigation. Internet access is needed for the first preparation. Requires LSP4IJ and TextMate Bundles.</description>
   <idea-version since-build="253"/>
   <depends>com.intellij.modules.platform</depends>
   <depends>com.intellij.modules.lang</depends>
+  <depends>com.intellij.modules.xml</depends>
   <depends>com.redhat.devtools.lsp4ij</depends>
   <depends>org.jetbrains.plugins.textmate</depends>
   <extensions defaultExtensionNs="com.intellij">
+    <additionalTextAttributes scheme="Darcula" file="colorSchemes/SignalDarcula.xml"/>
+    <additionalTextAttributes scheme="Dark" file="colorSchemes/SignalDark.xml"/>
+    <additionalTextAttributes scheme="High contrast" file="colorSchemes/SignalHighContrast.xml"/>
+    <additionalTextAttributes scheme="Light" file="colorSchemes/SignalLight.xml"/>
+    <additionalTextAttributes scheme="IntelliJ Light" file="colorSchemes/SignalLight.xml"/>
     <completion.contributor language="any" implementationClass="dev.angularlite.TemplateCompletion" order="first, before LSPCompletionContributor"/>
     <typedHandler implementation="dev.angularlite.TemplateCompletion$Typed"/>
     <gotoDeclarationHandler implementation="dev.angularlite.ComponentNavigation" order="first"/>

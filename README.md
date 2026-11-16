@@ -27,7 +27,7 @@ for the tested IDEA 2026.2.4). Keep the runtime bundled with your IDE.
 ## Installation
 
 1. Install LSP4IJ and enable TextMate Bundles as described above.
-2. Download **angular-lite-0.1.0.zip** from the
+2. Obtain the installable ZIP from the build output or download a published version from the
    [Releases page](https://github.com/apavarino/angular-lite/releases).
 3. Open **Settings > Plugins > gear icon > Install Plugin from Disk** and select
    the ZIP without extracting it. On macOS, use IntelliJ IDEA > Settings.
@@ -37,8 +37,6 @@ for the tested IDEA 2026.2.4). Keep the runtime bundled with your IDE.
    **Settings > Editor > File Types**. Keep `.html` associated with HTML.
 
 Plugin settings are under **Languages & Frameworks > Angular Lite**.
-For an update that retains version 0.1.0, reinstall the ZIP and restart the IDE
-so existing language-server processes use the new code.
 
 Before a tagged release exists, a manually triggered successful
 [Build plugin workflow](https://github.com/apavarino/angular-lite/actions/workflows/release.yml)
@@ -62,6 +60,13 @@ artifact downloads; tagged releases provide a direct ZIP download.
   with the default keymap, or invoke the action from the menu.
 - Component tag navigation and resolved expression highlighting, including
   bindings with whitespace around `=`.
+- Go to Declaration on a component's `selector` string lists the template
+  usages found by Angular. Custom element names use the editor's HTML custom-tag style.
+- Angular bindings, block names, braces, interpolation delimiters and TypeScript
+  decorators follow the editor color scheme. The Angular language service distinguishes
+  template locals, component fields, methods and signals for semantic highlighting.
+- External templates trigger completion on `[`, `(` and `.` for component inputs,
+  outputs and expression members.
 - Multiple Angular dependency roots, with separate servers and routing to the
   closest root. Detection is limited to 8 directory levels and 10,000 folders.
 
@@ -113,7 +118,7 @@ python build.py --idea /path/to/idea
 
 On macOS, pass the application's `Contents` directory. Alternatively, set
 `ANGULAR_LITE_IDEA` to the IDE directory. The result is
-`dist/angular-lite-0.1.0.zip`; IDEA and LSP4IJ binaries are not bundled.
+`dist/angular-lite-0.1.2.zip`; IDEA and LSP4IJ binaries are not bundled.
 
 ## Troubleshooting
 

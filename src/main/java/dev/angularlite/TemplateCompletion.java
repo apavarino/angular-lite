@@ -105,7 +105,7 @@ public final class TemplateCompletion extends CompletionContributor {
 
     public static final class Typed extends TypedHandlerDelegate {
         @Override public Result checkAutoPopup(char typed, Project project, Editor editor, PsiFile file) {
-            if ((typed == '@' || typed == '*') && file.getVirtualFile() != null
+            if ("@*[(.".indexOf(typed) >= 0 && file.getVirtualFile() != null
                 && "html".equalsIgnoreCase(file.getVirtualFile().getExtension())
                 && new AngularMatcher().match(file.getVirtualFile(), project)) {
                 AutoPopupController.getInstance(project).scheduleAutoPopup(editor);
